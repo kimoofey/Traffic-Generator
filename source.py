@@ -6,8 +6,9 @@
 #
 # WARNING! All changes made in this file will be lost!
 
-import sys
+from scapy.all import *
 from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtWidgets import QComboBox
 
 
 class Ui_MainWindow(object):
@@ -404,7 +405,67 @@ class Ui_MainWindow(object):
         self.sendButton.clicked.connect(self.sendPacket)
         self.sendAllButton.clicked.connect(self.sendAll)
 
+        interfaces = get_windows_if_list()
+        for i in range(len(interfaces) - 1):
+            self.ipNetworkAdapter.addItem(str(interfaces[i].get("description")))
+
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
+
+        self.ipSourceIPCheckbox.stateChanged.connect(self.ipSourceIPState)
+        self.ipChecksumCheckbox.stateChanged.connect(self.ipChecksumState)
+        self.ipTotalLengthCheckbox.stateChanged.connect(self.ipTotalLengthState)
+        self.sourceMACCheckbox.stateChanged.connect(self.sourceMACState)
+        self.destinationMACCheckbox.stateChanged.connect(self.destinationMACState)
+        self.tcpChecksumCheckbox.stateChanged.connect(self.tcpChecksumState)
+        self.udpLengthCheckbox.stateChanged.connect(self.udpLengthState)
+        self.udpChecksumCheckbox.stateChanged.connect(self.udpChecksumState)
+        self.icmpChecksumCheckbox.stateChanged.connect(self.icmpChecksumState)
+
+    def ipSourceIPState(self):
+        if self.ipSourceIPCheckbox.isChecked():
+            self.ipSourceIP.setDisabled(True)
+        else:
+            self.ipSourceIP.setEnabled(True)
+    def ipChecksumState(self):
+        if self.ipChecksumCheckbox.isChecked():
+            self.ipChecksum.setDisabled(True)
+        else:
+            self.ipChecksum.setEnabled(True)
+    def ipTotalLengthState(self):
+        if self.ipTotalLengthCheckbox.isChecked():
+            self.ipTotalLength.setDisabled(True)
+        else:
+            self.ipTotalLength.setEnabled(True)
+    def sourceMACState(self):
+        if self.sourceMACCheckbox.isChecked():
+            self.sourceMAC.setDisabled(True)
+        else:
+            self.sourceMAC.setEnabled(True)
+    def destinationMACState(self):
+        if self.destinationMACCheckbox.isChecked():
+            self.destinationMAC.setDisabled(True)
+        else:
+            self.destinationMAC.setEnabled(True)
+    def tcpChecksumState(self):
+        if self.tcpChecksumCheckbox.isChecked():
+            self.tcpChecksum.setDisabled(True)
+        else:
+            self.tcpChecksum.setEnabled(True)
+    def udpLengthState(self):
+        if self.udpLengthCheckbox.isChecked():
+            self.udpLength.setDisabled(True)
+        else:
+            self.udpLength.setEnabled(True)
+    def udpChecksumState(self):
+        if self.udpChecksumCheckbox.isChecked():
+            self.udpChecksum.setDisabled(True)
+        else:
+            self.udpChecksum.setEnabled(True)
+    def icmpChecksumState(self):
+        if self.icmpChecksumCheckbox.isChecked():
+            self.icmpChecksum.setDisabled(True)
+        else:
+            self.icmpChecksum.setEnabled(True)
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
