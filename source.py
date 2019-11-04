@@ -5,11 +5,19 @@
 # Created by: PyQt5 UI code generator 5.13.0
 #
 # WARNING! All changes made in this file will be lost!
-
-from scapy.all import *
+import os
+from scapy.arch.windows import *
+from scapy.layers.inet import *
+from scapy.sendrecv import *
+from scapy.utils import *
+from scapy.arch import *
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QComboBox
+from PyQt5.QtWidgets import QComboBox, QFileDialog
+from pathlib import Path, PureWindowsPath
 
+TCP_NUM = 6
+UDP_NUM = 17
+ICMP_NUM = 1
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -408,6 +416,7 @@ class Ui_MainWindow(object):
         interfaces = get_windows_if_list()
         for i in range(len(interfaces) - 1):
             self.ipNetworkAdapter.addItem(str(interfaces[i].get("description")))
+            # print(interfaces[i])
 
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
@@ -420,6 +429,48 @@ class Ui_MainWindow(object):
         self.udpLengthCheckbox.stateChanged.connect(self.udpLengthState)
         self.udpChecksumCheckbox.stateChanged.connect(self.udpChecksumState)
         self.icmpChecksumCheckbox.stateChanged.connect(self.icmpChecksumState)
+        self.ipMF.stateChanged.connect(self.checkIPFlags)
+        self.ipDF.stateChanged.connect(self.checkIPFlags)
+        self.ipReserved.stateChanged.connect(self.checkIPFlags)
+        self.packetsList.itemClicked.connect(self.showPacketInfo)
+        # Mockups TCP
+        self.tcpSourcePort.setText("20")
+        self.tcpDestinationPort.setText("80")
+        self.tcpSeqNumber.setText("0")
+        self.tcpAckNumber.setText("0")
+        self.tcpOffset.setText("5")
+        self.tcpReserved.setText("0")
+        self.tcpWindSize.setText("8192")
+        self.tcpUrPointer.setText("0")
+
+        # self.sourceMAC.setText()
+        # self.destinationMAC.setText()
+
+        self.ipVersion.setText("4")
+        self.ipIHL.setText("5")
+        self.ipID.setText("1")
+        self.ipTTL.setText("64")
+        self.ipDestinationIP.setText("127.0.0.1")
+
+        self.ipSourceIP.setText("127.0.0.1")
+        # self.ipChecksum.setText("")
+        self.ipTotalLength.setText("67")
+
+        # Mockups UDP
+        self.udpSourcePort.setText("53")
+        self.udpDestinationPort.setText("53")
+
+        # Mockups ICMP
+        self.icmpSeqNumber.setText("0")
+        self.icmpCode.setText("8")
+        self.icmpID.setText("0")
+
+    def showPacketInfo(self):
+        print(self.packetsList.currentItem().text())
+        packet = rdpcap(self.packetsList.currentItem().text())
+        send(packet, return_packets=True)
+        packet.show()
+        return
 
     def ipSourceIPState(self):
         if self.ipSourceIPCheckbox.isChecked():
@@ -466,6 +517,19 @@ class Ui_MainWindow(object):
             self.icmpChecksum.setDisabled(True)
         else:
             self.icmpChecksum.setEnabled(True)
+
+    def checkIPFlags(self):
+        if self.ipReserved.isChecked():
+            self.ipMF.setCheckState(False)
+            self.ipDF.setCheckState(False)
+
+        if self.ipDF.isChecked():
+            self.ipMF.setCheckState(False)
+            self.ipReserved.setCheckState(False)
+
+        if self.ipMF.isChecked():
+            self.ipDF.setCheckState(False)
+            self.ipReserved.setCheckState(False)
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
@@ -577,16 +641,146 @@ class Ui_MainWindow(object):
         self.sendAllButton.setText(_translate("MainWindow", "Send all"))
         self.sendButton.setText(_translate("MainWindow", "Send"))
 
+    def readData(self):
+        packet = Ether()
+
+        my_macs = [get_if_hwaddr(i) for i in get_if_list()]
+        print(my_macs)
+
+        if not self.sourceMACCheckbox.isChecked():
+            packet[Ether].src = self.sourceMAC.text()
+
+        if not self.destinationMACCheckbox.isChecked():
+            packet[Ether].dst = self.destinationMAC.text()
+
+        packet = packet / IP()
+        packet[IP].version = int(self.ipVersion.text())
+        packet[IP].ihl = int(self.ipIHL.text())
+        packet[IP].tos = self.calcTOS()
+        packet[IP].id = int(self.ipID.text())
+        packet[IP].flags = self.calcFlags()
+        packet[IP].ttl = int(self.ipTTL.text())
+        packet[IP].dst = self.ipDestinationIP.text()
+
+        if not self.ipSourceIPCheckbox.isChecked():
+            packet[IP].src = self.ipSourceIP.text()
+
+        if not self.ipChecksumCheckbox.isChecked():
+            packet[IP].chksum = self.ipChecksum.text()
+
+        if not self.ipTotalLengthCheckbox.isChecked():
+            packet[IP].len = int(self.ipTotalLength.text())
+
+        if self.tabWidget.currentIndex() == 0:
+            packet[IP].proto = TCP_NUM
+            packetTCP = packet / TCP()
+            packetTCP[TCP].sport = int(self.tcpSourcePort.text())
+            packetTCP[TCP].dport = int(self.tcpDestinationPort.text())
+            packetTCP[TCP].seq = int(self.tcpSeqNumber.text())
+            packetTCP[TCP].ack = int(self.tcpAckNumber.text())
+            packetTCP[TCP].dataofs = int(self.tcpOffset.text())
+            packetTCP[TCP].reserved = int(self.tcpReserved.text())
+            packetTCP[TCP].window = int(self.tcpWindSize.text())
+            packetTCP[TCP].urgptr = int(self.tcpUrPointer.text())
+
+            if self.tcpURG.isChecked():
+                packetTCP[TCP].flags = "U"
+            if self.tcpACK.isChecked():
+                packetTCP[TCP].flags = "A"
+            if self.tcpPSH.isChecked():
+                packetTCP[TCP].flags = "P"
+            if self.tcpRST.isChecked():
+                packetTCP[TCP].flags = "R"
+            if self.tcpSYN.isChecked():
+                packetTCP[TCP].flags = "S"
+            if self.tcpFIN.isChecked():
+                packetTCP[TCP].flags = "F"
+
+            if not self.tcpChecksumCheckbox.isChecked():
+                packetTCP[TCP].chksum = int(self.tcpChecksum.text())
+            print(packetTCP.show())
+            packet = packetTCP
+        elif self.tabWidget.currentIndex() == 1:
+            packet[IP].proto = UDP_NUM
+            packetUDP = packet / UDP()
+
+            packetUDP[UDP].sport = int(self.udpSourcePort.text())
+            packetUDP[UDP].dport = int(self.udpDestinationPort.text())
+
+            if not self.udpLengthCheckbox.isChecked():
+                packetUDP[UDP].len = int(self.tcpChecksum.text())
+
+            print(packetUDP.show())
+            packet = packetUDP
+        else:
+            packet[IP].proto = ICMP_NUM
+            packetICMP = packet / ICMP()
+            packetICMP[ICMP].type = int(self.icmpType.currentText())
+            packetICMP[ICMP].seq = int(self.icmpSeqNumber.text())
+            packetICMP[ICMP].code = int(self.icmpCode.text())
+            packetICMP[ICMP].id = int(self.icmpID.text())
+
+            if not self.icmpChecksumCheckbox.isChecked():
+                packetICMP[ICMP].chksum = int(self.icmpChecksum.text())
+
+            print("ICMP")
+            packet = packetICMP
+
+        return packet
+
+    def calcTOS(self):
+        tos = bin(int(self.ipPrecendence.text()))
+        tos = str(tos)
+        if self.ipDelay.isChecked():
+            tos += '1'
+        else:
+            tos += '0'
+        if self.ipThroughput.isChecked():
+            tos += '1'
+        else:
+            tos += '0'
+        if self.ipReliability.isChecked():
+            tos += '1'
+        else:
+            tos += '0'
+
+        if self.ipECN.currentIndex() == 0:
+            tos += '01'
+        if self.ipECN.currentIndex() == 1:
+            tos += '00'
+        else:
+            tos += '11'
+
+        tos = int(tos, 2)
+        return tos
+
+    def calcFlags(self):
+        if self.ipReserved.isChecked():
+            return ""
+        if self.ipDF.isChecked():
+            return "DF"
+        if self.ipMF.isChecked():
+            return "MF"
+
     def clear(self):
-        #TODO clear functiond
+        self.packetsList.clear()
         return
 
     def delete(self):
-        # TODO delete function
+        packet = self.packetsList.row(self.packetsList.currentItem())
+        self.packetsList.takeItem(packet)
         return
 
+    def openFileNameDialog(self):
+        fileName = QFileDialog.getOpenFileName(MainWindow, "Choose file", "C:\\Users\\kimoo\\Desktop",
+                                               "All files (*.*);;Packet Capture (*.cap)")
+        print(Path(fileName[0]))
+        return fileName[0]
+
     def load(self):
-        # TODO load function
+        packet = self.openFileNameDialog()
+        packet = str(PureWindowsPath(packet))
+        self.packetsList.addItem(packet)
         return
 
     def add(self):
@@ -594,15 +788,26 @@ class Ui_MainWindow(object):
         return
 
     def save(self):
-        # TODO save function
+        packet = self.readData()
+        filePath = "C:\\Users\\kimoo\\Desktop\\"
+        filePath += str(self.packetName.text())
+        filePath += ".cap"
+        wrpcap(filePath, packet)
         return
 
     def sendPacket(self):
-        # TODO function that sending packet
+        packet = self.readData()
+        interface = self.ipNetworkAdapter.currentText()
+        send(packet, return_packets=True, iface=interface)
         return
 
     def sendAll(self):
-        # TODO function that send all packets
+        print(self.packetsList.count())
+        for i in range(self.packetsList.count()):
+            item = self.packetsList.item(i)
+            packet = rdpcap(item.text())
+            send(packet, return_packets=True)
+
         return
 
 if __name__ == "__main__":
