@@ -5,14 +5,12 @@
 # Created by: PyQt5 UI code generator 5.13.0
 #
 # WARNING! All changes made in this file will be lost!
-import os
-from scapy.arch.windows import *
 from scapy.layers.inet import *
 from scapy.sendrecv import *
 from scapy.utils import *
 from scapy.arch import *
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QComboBox, QFileDialog
+from PyQt5 import QtCore, QtWidgets
+from PyQt5.QtWidgets import QFileDialog
 from pathlib import Path, PureWindowsPath
 
 TCP_NUM = 6
@@ -415,7 +413,8 @@ class Ui_MainWindow(object):
 
         interfaces = get_windows_if_list()
         for i in range(len(interfaces) - 1):
-            self.ipNetworkAdapter.addItem(str(interfaces[i].get("description")))
+            self.ipNetworkAdapter.addItem(
+                str(interfaces[i].get("name")) + " - " + str(interfaces[i].get("description")))
             # print(interfaces[i])
 
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
@@ -443,18 +442,20 @@ class Ui_MainWindow(object):
         self.tcpWindSize.setText("8192")
         self.tcpUrPointer.setText("0")
 
-        # self.sourceMAC.setText()
-        # self.destinationMAC.setText()
-
         self.ipVersion.setText("4")
         self.ipIHL.setText("5")
         self.ipID.setText("1")
         self.ipTTL.setText("64")
         self.ipDestinationIP.setText("127.0.0.1")
-
+        self.ipPrecendence.setText("0")
         self.ipSourceIP.setText("127.0.0.1")
-        # self.ipChecksum.setText("")
         self.ipTotalLength.setText("67")
+        self.ipChecksumCheckbox.setChecked(True)
+        self.ipTotalLengthCheckbox.setChecked(True)
+        self.ipSourceIPCheckbox.setChecked(True)
+        self.ipDF.setChecked(True)
+        self.sourceMACCheckbox.setChecked(True)
+        self.destinationMACCheckbox.setChecked(True)
 
         # Mockups UDP
         self.udpSourcePort.setText("53")
@@ -468,7 +469,11 @@ class Ui_MainWindow(object):
     def showPacketInfo(self):
         print(self.packetsList.currentItem().text())
         packet = rdpcap(self.packetsList.currentItem().text())
-        send(packet, return_packets=True)
+
+        index = self.ipNetworkAdapter.currentIndex()
+        interfaces = get_windows_if_list()
+        inter = interfaces[index].get("description")
+        send(packet, iface=inter)
         packet.show()
         return
 
@@ -517,7 +522,6 @@ class Ui_MainWindow(object):
             self.icmpChecksum.setDisabled(True)
         else:
             self.icmpChecksum.setEnabled(True)
-
     def checkIPFlags(self):
         if self.ipReserved.isChecked():
             self.ipMF.setCheckState(False)
@@ -642,18 +646,19 @@ class Ui_MainWindow(object):
         self.sendButton.setText(_translate("MainWindow", "Send"))
 
     def readData(self):
-        packet = Ether()
+        # packet = Ether()
+        #
+        # if not self.sourceMACCheckbox.isChecked():
+        #     packet[Ether].src = self.sourceMAC.text()
+        # else:
+        #     index = self.ipNetworkAdapter.currentIndex()
+        #     interfaces = get_windows_if_list()
+        #     packet[Ether].src = interfaces[index].get("mac")
+        #
+        # if not self.destinationMACCheckbox.isChecked():
+        #     packet[Ether].dst = self.destinationMAC.text()
 
-        my_macs = [get_if_hwaddr(i) for i in get_if_list()]
-        print(my_macs)
-
-        if not self.sourceMACCheckbox.isChecked():
-            packet[Ether].src = self.sourceMAC.text()
-
-        if not self.destinationMACCheckbox.isChecked():
-            packet[Ether].dst = self.destinationMAC.text()
-
-        packet = packet / IP()
+        packet = IP()
         packet[IP].version = int(self.ipVersion.text())
         packet[IP].ihl = int(self.ipIHL.text())
         packet[IP].tos = self.calcTOS()
@@ -698,7 +703,7 @@ class Ui_MainWindow(object):
 
             if not self.tcpChecksumCheckbox.isChecked():
                 packetTCP[TCP].chksum = int(self.tcpChecksum.text())
-            print(packetTCP.show())
+
             packet = packetTCP
         elif self.tabWidget.currentIndex() == 1:
             packet[IP].proto = UDP_NUM
@@ -710,7 +715,6 @@ class Ui_MainWindow(object):
             if not self.udpLengthCheckbox.isChecked():
                 packetUDP[UDP].len = int(self.tcpChecksum.text())
 
-            print(packetUDP.show())
             packet = packetUDP
         else:
             packet[IP].proto = ICMP_NUM
@@ -723,9 +727,10 @@ class Ui_MainWindow(object):
             if not self.icmpChecksumCheckbox.isChecked():
                 packetICMP[ICMP].chksum = int(self.icmpChecksum.text())
 
-            print("ICMP")
             packet = packetICMP
 
+        packet = packet / self.ipData.toPlainText()
+        print(packet)
         return packet
 
     def calcTOS(self):
@@ -774,17 +779,12 @@ class Ui_MainWindow(object):
     def openFileNameDialog(self):
         fileName = QFileDialog.getOpenFileName(MainWindow, "Choose file", "C:\\Users\\kimoo\\Desktop",
                                                "All files (*.*);;Packet Capture (*.cap)")
-        print(Path(fileName[0]))
         return fileName[0]
 
     def load(self):
         packet = self.openFileNameDialog()
         packet = str(PureWindowsPath(packet))
         self.packetsList.addItem(packet)
-        return
-
-    def add(self):
-        # TODO add function
         return
 
     def save(self):
@@ -795,18 +795,31 @@ class Ui_MainWindow(object):
         wrpcap(filePath, packet)
         return
 
+    def getInterface(self):
+        iface = None
+        for i in get_if_list():
+            print(i)
+            if "\\Device\\NPF_{4F65BF41-7731-41E0-9D24-A51413E698F3}" in i:
+                iface = i
+        if not iface:
+            print("Cannot find Realtek PCIe GBE Family Controller interface")
+        return iface
+
     def sendPacket(self):
         packet = self.readData()
-        interface = self.ipNetworkAdapter.currentText()
-        send(packet, return_packets=True, iface=interface)
+        index = self.ipNetworkAdapter.currentIndex()
+        interface = get_windows_if_list()
+        send(packet, iface=interface[index].get("name"))
         return
 
     def sendAll(self):
         print(self.packetsList.count())
+        index = self.ipNetworkAdapter.currentIndex()
+        interface = get_windows_if_list()
         for i in range(self.packetsList.count()):
             item = self.packetsList.item(i)
             packet = rdpcap(item.text())
-            send(packet, return_packets=True)
+            send(packet, iface=interface[index].get("name"))
 
         return
 
