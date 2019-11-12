@@ -406,7 +406,7 @@ class Ui_MainWindow(object):
         self.clearButton.clicked.connect(self.clear)
         self.deleteButton.clicked.connect(self.delete)
         self.loadButton.clicked.connect(self.load)
-        self.addButton.clicked.connect(self.add)
+        # self.addButton.clicked.connect(self.add)
         self.saveButton.clicked.connect(self.save)
         self.sendButton.clicked.connect(self.sendPacket)
         self.sendAllButton.clicked.connect(self.sendAll)
@@ -646,17 +646,6 @@ class Ui_MainWindow(object):
         self.sendButton.setText(_translate("MainWindow", "Send"))
 
     def readData(self):
-        # packet = Ether()
-        #
-        # if not self.sourceMACCheckbox.isChecked():
-        #     packet[Ether].src = self.sourceMAC.text()
-        # else:
-        #     index = self.ipNetworkAdapter.currentIndex()
-        #     interfaces = get_windows_if_list()
-        #     packet[Ether].src = interfaces[index].get("mac")
-        #
-        # if not self.destinationMACCheckbox.isChecked():
-        #     packet[Ether].dst = self.destinationMAC.text()
 
         packet = IP()
         packet[IP].version = int(self.ipVersion.text())
@@ -666,12 +655,13 @@ class Ui_MainWindow(object):
         packet[IP].flags = self.calcFlags()
         packet[IP].ttl = int(self.ipTTL.text())
         packet[IP].dst = self.ipDestinationIP.text()
+        packet[IP].frag = int(self.ipOffset.text())
 
         if not self.ipSourceIPCheckbox.isChecked():
             packet[IP].src = self.ipSourceIP.text()
 
         if not self.ipChecksumCheckbox.isChecked():
-            packet[IP].chksum = self.ipChecksum.text()
+            packet[IP].chksum = int(self.ipChecksum.text())
 
         if not self.ipTotalLengthCheckbox.isChecked():
             packet[IP].len = int(self.ipTotalLength.text())
@@ -713,7 +703,10 @@ class Ui_MainWindow(object):
             packetUDP[UDP].dport = int(self.udpDestinationPort.text())
 
             if not self.udpLengthCheckbox.isChecked():
-                packetUDP[UDP].len = int(self.tcpChecksum.text())
+                packetUDP[UDP].len = int(self.udpLength.text())
+
+            if not self.udpChecksumCheckbox.isChecked():
+                packetUDP[UDP].chksum = int(self.udpChecksum.text())
 
             packet = packetUDP
         else:
